@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 
 DB_CONFIG = {
     'host': 'localhost',
-    'database': 'C:/EXCHBIH/NOVAC-2026.FDB',
+    'database': 'C:/EXCHBIH/EXCHANGE-2026ISM.FDB',
     'user': 'SYSDBA',
     'password': 'masterkey'
 }
@@ -90,6 +90,7 @@ def get_transactions(start_date, end_date):
             LEFT JOIN VALUTE v ON bt.TEC_VALUTA_BROJCANO = v.VALUTA_BROJCANO
             WHERE bt.TEC_TL_DATUM_TECAJNE_LISTE >= CAST('{start_str}' AS DATE)
               AND bt.TEC_TL_DATUM_TECAJNE_LISTE <= CAST('{end_str}' AS DATE)
+              AND bt.VTR_VRSTA_TRANSAKCIJE = 'FG'
             ORDER BY bt.ID_BT
         '''
         

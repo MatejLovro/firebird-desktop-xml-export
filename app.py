@@ -53,6 +53,42 @@ def get_uniqueid():
         print(f"❌ Greška pri dohvaćanju UNIQUEID: {e}")
         messagebox.showerror("Greška", f"Greška pri dohvaćanju UNIQUEID:\n{e}")
         return None
+    
+
+def replace_croatian_chars(text):
+    """
+    Zamjenjuje hrvatske dijakritičke znakove s hexadecimalnim kodovima.
+    
+    Parametri:
+        text: string za zamjenu
+    
+    Vraća:
+        string s zamijenjenim znakovima
+    """
+    if not text:
+        return ''
+    
+    text = str(text)
+    
+    # Mapa: hrvatski znak -> hex kod
+    replacements = {
+        'Č': '&#x010C;',  # Č veliko
+        'č': '&#x010D;',  # č malo
+        'Ć': '&#x0106;',  # Ć veliko
+        'ć': '&#x0107;',  # ć malo
+        'Š': '&#x0160;',  # Š veliko
+        'š': '&#x0161;',  # š malo
+        'Ž': '&#x017D;',  # Ž veliko
+        'ž': '&#x017E;',  # ž malo
+        'Đ': '&#x0110;',  # Đ veliko
+        'đ': '&#x0111;',  # đ malo
+    }
+    
+    for char, code in replacements.items():
+        text = text.replace(char, code)
+    
+    return text
+
 
 def get_idblag_for_date(date_str):
     """
@@ -233,18 +269,6 @@ def get_transactions_for_idblag(id_blag):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def get_transactions(start_date, end_date):
     """
     Dohvaća transakcije iz BLAGAJNICKE_TRANSAKCIJE za zadani period.
@@ -416,7 +440,7 @@ def generate_xml(valto_nbr, start_date, end_date):
             transactions = get_transactions_for_idblag(id_blag)
             print(f"  ✓ Transakcije: {len(transactions)}")
             
-            # Brojač za nbr (resetuje se za svaki datum)
+            # Brojač za nbr (resetira se za svaki datum)
             nbr_counter = 1
             
             for t in transactions:
@@ -439,10 +463,19 @@ def generate_xml(valto_nbr, start_date, end_date):
                 ET.SubElement(kozonseges_tetel, 'fiz_mod').text = str(t['oznaka_platnog']) if t['oznaka_platnog'] else ''
                 ET.SubElement(kozonseges_tetel, 'ertek').text = f"{float(t['iznos_valuta']):.2f}" if t['iznos_valuta'] else '0.00'
                 ET.SubElement(kozonseges_tetel, 'akt_arf').text = str(t['primjenjeni_tecaj']) if t['primjenjeni_tecaj'] else ''
+
                 ET.SubElement(kozonseges_tetel, 'alap_arf').text = str(t['primjenjeni_tecaj']) if t['primjenjeni_tecaj'] else ''
+
+                # alap_arf_tecaj = get_kupovni_tecaj(d_datum, t['valuta'])
+                # ET.SubElement(kozonseges_tetel, 'alap_arf').text = str(alap_arf_tecaj) if alap_arf_tecaj else ''
+
+
                 ET.SubElement(kozonseges_tetel, 'bank_arf').text = f"{float(t['provbanke']):.2f}" if t['provbanke'] else '0.00'
                 ET.SubElement(kozonseges_tetel, 'honnan_hova').text = ''
-                ET.SubElement(kozonseges_tetel, 'vevo_kod').text = str(t['prodaoime']) if t['prodaoime'] else ''
+
+                # ET.SubElement(kozonseges_tetel, 'vevo_kod').text = str(t['prodaoime']) if t['prodaoime'] else ''
+                ET.SubElement(kozonseges_tetel, 'vevo_kod').text = replace_croatian_chars(t['prodaoime'])
+
                 ET.SubElement(kozonseges_tetel, 'vevo_cim').text = ''
                 ET.SubElement(kozonseges_tetel, 'vevo_utlevel_id').text = str(t['prodaodok']) if t['prodaodok'] else ''
                 ET.SubElement(kozonseges_tetel, 'vevo_orszag').text = ''

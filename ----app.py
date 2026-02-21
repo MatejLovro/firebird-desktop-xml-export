@@ -5,133 +5,55 @@ from datetime import datetime, timedelta
 import fdb
 import os
 import xml.etree.ElementTree as ET
-import configparser
-import sys
-from ftplib import FTP
 
 # ═══════════════════════════════════════════════════════════
-# KONFIGURACIJA IZ INI DATOTEKE
+# KONFIGURACIJA
 # ═══════════════════════════════════════════════════════════
 
-
-def load_config():
-    """
-    Učitava konfiguraciju iz REPORT.INI datoteke.
-    Vraća: dictionary s konfiguracijskim podacima ili None
-    """
-    config_file = "REPORT.INI"
-
-    # Ako se pokreće kao .exe, traži INI u istom folderu kao .exe
-    if getattr(sys, "frozen", False):
-        # Pokrenuto kao .exe
-        application_path = os.path.dirname(sys.executable)
-    else:
-        # Pokrenuto kao .py
-        application_path = os.path.dirname(os.path.abspath(__file__))
-
-    config_path = os.path.join(application_path, config_file)
-
-    print(f"Tražim konfiguracijsku datoteku: {config_path}")
-
-    if not os.path.exists(config_path):
-        print(f"❌ Konfiguracijska datoteka ne postoji: {config_path}")
-        messagebox.showerror(
-            "Greška",
-            f"Konfiguracijska datoteka nije pronađena:\n{config_path}\n\n"
-            f"Molimo kreirajte REPORT.INI datoteku u folderu aplikacije.",
-        )
-        return None
-
-    try:
-        config = configparser.ConfigParser()
-        config.read(config_path, encoding="utf-8")
-
-        # Učitaj DATABASE sekciju
-        db_config = {
-            "database": config.get("DATABASE", "database"),
-            "host": config.get("DATABASE", "host"),
-            "user": config.get("DATABASE", "user"),
-            "password": config.get("DATABASE", "password"),
-            "charset": "UTF8",
-        }
-
-        # Učitaj FTP sekciju
-        ftp_config = {
-            "host": config.get("FTP", "host"),
-            "user": config.get("FTP", "user"),
-            "password": config.get("FTP", "password"),
-        }
-
-        print("✓ Konfiguracija uspješno učitana")
-        print(f"  Database: {db_config['database']}")
-        print(f"  FTP Host: {ftp_config['host']}")
-
-        return {"database": db_config, "ftp": ftp_config}
-
-    except Exception as e:
-        print(f"❌ Greška pri čitanju konfiguracije: {e}")
-        messagebox.showerror("Greška", f"Greška pri učitavanju REPORT.INI:\n{e}")
-        return None
-
-
-# Učitaj konfiguraciju pri pokretanju
-CONFIG = load_config()
-
-if CONFIG is None:
-    print("❌ Aplikacija se ne može pokrenuti bez ispravne konfiguracije!")
-    # Ne nastavljaj dalje ako nema konfiguracije
-    import sys
-
-    sys.exit(1)
-
-# Ažuriraj DB_CONFIG s podacima iz INI datoteke
-DB_CONFIG = CONFIG["database"]
-FTP_CONFIG = CONFIG["ftp"]
+DB_CONFIG = {
+    "host": "localhost",
+    "database": "C:/EXCHBIH/EXCHANGE-2026ISM.FDB",
+    "user": "SYSDBA",
+    "password": "masterkey",
+}
 
 # Globalna varijabla za naziv XML datoteke
 current_xml_file = None
-
-# Globalna konekcija na bazu
-global_connection = None
-
 # ═══════════════════════════════════════════════════════════
-# DATABASE CONNECTION MANAGEMENT
+# FIREBIRD FUNKCIJE (ne ovise o GUI-u)
 # ═══════════════════════════════════════════════════════════
 
 
-def connect_to_database():
+def get_uniqueid():
     """
-    Otvara globalnu konekciju na bazu podataka.
-    Vraća: fdb.Connection objekt ili None
+    Dohvaća UNIQUEID iz tablice FIRME (slog s najvećim IDFIRME).
+    Vraća: string (UNIQUEID) ili None
     """
-    global global_connection
     try:
-        if global_connection is None:
-            print("Otvaranje konekcije na bazu...")
-            global_connection = fdb.connect(**DB_CONFIG)
-            print("✓ Konekcija uspješno otvorena")
-        return global_connection
+        print("Spajam se na Firebird bazu...")
+        con = fdb.connect(**DB_CONFIG)
+        cur = con.cursor()
+
+        sql = "SELECT FIRST 1 UNIQUEID FROM FIRME ORDER BY IDFIRME DESC"
+        print(f"Izvršavam SQL: {sql}")
+
+        cur.execute(sql)
+        row = cur.fetchone()
+
+        con.close()
+
+        if row:
+            valto_nbr = row[0]
+            print(f"✓ Dohvaćen UNIQUEID: {valto_nbr}")
+            return valto_nbr
+        else:
+            print("❌ Nema podataka u tablici FIRME")
+            return None
+
     except Exception as e:
-        print(f"❌ Greška pri spajanju na bazu: {e}")
-        messagebox.showerror("Greška", f"Ne mogu se spojiti na bazu:\n{e}")
+        print(f"❌ Greška pri dohvaćanju UNIQUEID: {e}")
+        messagebox.showerror("Greška", f"Greška pri dohvaćanju UNIQUEID:\n{e}")
         return None
-
-
-def close_database_connection():
-    """Zatvara globalnu konekciju na bazu."""
-    global global_connection
-    if global_connection:
-        try:
-            global_connection.close()
-            global_connection = None
-            print("✓ Konekcija zatvorena")
-        except Exception as e:
-            print(f"⚠ Greška pri zatvaranju konekcije: {e}")
-
-
-# ═══════════════════════════════════════════════════════════
-# HELPER FUNKCIJE - HRVATSKE DIJAKRITIČKE ZNAKOVE
-# ═══════════════════════════════════════════════════════════
 
 
 def replace_croatian_chars(text):
@@ -151,59 +73,22 @@ def replace_croatian_chars(text):
 
     # Mapa: hrvatski znak -> hex kod
     replacements = {
-        "Č": "&#x010C;",
-        "č": "&#x010D;",
-        "Ć": "&#x0106;",
-        "ć": "&#x0107;",
-        "Š": "&#x0160;",
-        "š": "&#x0161;",
-        "Ž": "&#x017D;",
-        "ž": "&#x017E;",
-        "Đ": "&#x0110;",
-        "đ": "&#x0111;",
+        "Č": "&#x010C;",  # Č veliko
+        "č": "&#x010D;",  # č malo
+        "Ć": "&#x0106;",  # Ć veliko
+        "ć": "&#x0107;",  # ć malo
+        "Š": "&#x0160;",  # Š veliko
+        "š": "&#x0161;",  # š malo
+        "Ž": "&#x017D;",  # Ž veliko
+        "ž": "&#x017E;",  # ž malo
+        "Đ": "&#x0110;",  # Đ veliko
+        "đ": "&#x0111;",  # đ malo
     }
 
     for char, code in replacements.items():
         text = text.replace(char, code)
 
     return text
-
-
-# ═══════════════════════════════════════════════════════════
-# FIREBIRD FUNKCIJE (koriste globalnu konekciju)
-# ═══════════════════════════════════════════════════════════
-
-
-def get_uniqueid():
-    """
-    Dohvaća UNIQUEID iz tablice FIRME (slog s najvećim IDFIRME).
-    Vraća: string (UNIQUEID) ili None
-    """
-    try:
-        con = connect_to_database()
-        if not con:
-            return None
-
-        cur = con.cursor()
-
-        sql = "SELECT FIRST 1 UNIQUEID FROM FIRME ORDER BY IDFIRME DESC"
-        print(f"SQL: {sql}")
-
-        cur.execute(sql)
-        row = cur.fetchone()
-
-        if row:
-            valto_nbr = row[0]
-            print(f"✓ Dohvaćen UNIQUEID: {valto_nbr}")
-            return valto_nbr
-        else:
-            print("❌ Nema podataka u tablici FIRME")
-            return None
-
-    except Exception as e:
-        print(f"❌ Greška pri dohvaćanju UNIQUEID: {e}")
-        messagebox.showerror("Greška", f"Greška pri dohvaćanju UNIQUEID:\n{e}")
-        return None
 
 
 def get_idblag_for_date(date_str):
@@ -217,16 +102,15 @@ def get_idblag_for_date(date_str):
         int (IDBLAG) ili None
     """
     try:
-        con = connect_to_database()
-        if not con:
-            return None
-
+        con = fdb.connect(**DB_CONFIG)
         cur = con.cursor()
 
         sql = f"SELECT IDBLAG FROM BLAGAJNA WHERE TL_DATUM_TECAJNE_LISTE = CAST('{date_str}' AS DATE)"
 
         cur.execute(sql)
         row = cur.fetchone()
+
+        con.close()
 
         if row:
             return row[0]
@@ -248,10 +132,7 @@ def get_blagajna_stanje(id_blag):
         lista dictionary objekata ili []
     """
     try:
-        con = connect_to_database()
-        if not con:
-            return []
-
+        con = fdb.connect(**DB_CONFIG)
         cur = con.cursor()
 
         sql = f"""
@@ -267,6 +148,8 @@ def get_blagajna_stanje(id_blag):
 
         cur.execute(sql)
         rows = cur.fetchall()
+
+        con.close()
 
         results = []
         for row in rows:
@@ -297,10 +180,7 @@ def get_kupovni_tecaj(date_str, valuta):
         float (KUPOVNI_TECAJ) ili 1.0
     """
     try:
-        con = connect_to_database()
-        if not con:
-            return 1.0
-
+        con = fdb.connect(**DB_CONFIG)
         cur = con.cursor()
 
         sql = f"""
@@ -314,9 +194,11 @@ def get_kupovni_tecaj(date_str, valuta):
         cur.execute(sql)
         row = cur.fetchone()
 
+        con.close()
+
         if row and row[0]:
             return float(row[0])
-        return 1.0
+        return 1.0  # Default ako nema tečaja
 
     except Exception as e:
         print(f"❌ Greška pri dohvaćanju KUPOVNI_TECAJ: {e}")
@@ -334,10 +216,7 @@ def get_all_kupovni_tecajevi_for_date(date_str):
         dictionary {valuta: kupovni_tecaj}
     """
     try:
-        con = connect_to_database()
-        if not con:
-            return {}
-
+        con = fdb.connect(**DB_CONFIG)
         cur = con.cursor()
 
         sql = f"""
@@ -351,6 +230,8 @@ def get_all_kupovni_tecajevi_for_date(date_str):
 
         cur.execute(sql)
         rows = cur.fetchall()
+
+        con.close()
 
         # Kreiraj dictionary: valuta -> tečaj
         tecajevi = {}
@@ -377,10 +258,7 @@ def get_transactions_for_idblag(id_blag):
         lista dictionary objekata ili []
     """
     try:
-        con = connect_to_database()
-        if not con:
-            return []
-
+        con = fdb.connect(**DB_CONFIG)
         cur = con.cursor()
 
         sql = f"""
@@ -407,6 +285,8 @@ def get_transactions_for_idblag(id_blag):
 
         cur.execute(sql)
         rows = cur.fetchall()
+
+        con.close()
 
         transactions = []
         for row in rows:
@@ -435,9 +315,91 @@ def get_transactions_for_idblag(id_blag):
         return []
 
 
-# ═══════════════════════════════════════════════════════════
-# XML GENERIRANJE
-# ═══════════════════════════════════════════════════════════
+def get_transactions(start_date, end_date):
+    """
+    Dohvaća transakcije iz BLAGAJNICKE_TRANSAKCIJE za zadani period.
+
+    Parametri:
+        start_date: datetime objekt (početni datum)
+        end_date: datetime objekt (završni datum)
+
+    Vraća:
+        lista dictionary objekata ili None
+    """
+    try:
+        print(f"Dohvaćam transakcije od {start_date} do {end_date}...")
+
+        con = fdb.connect(**DB_CONFIG)
+        cur = con.cursor()
+
+        # Formatiranje datuma za Firebird (YYYY-MM-DD)
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+
+        print(f"Formirani datumi: {start_str} - {end_str}")
+
+        # NOVI SQL upit s dodatnim poljima i JOIN-om s KORISNICI
+        sql = f"""
+            SELECT 
+                bt.TEC_TL_DATUM_TECAJNE_LISTE,
+                bt.TEC_VALUTA_BROJCANO,
+                bt.IZNOS_U_VALUTI,
+                bt.IZNOS_U_KUNAMA,
+                bt.DATUM_I_VRIJEME_TRANSAKCIJE,
+                bt.SERIJSKI_BROJ,
+                bt.BR_KARTICE,
+                bt.OZNAKA_PLATNOG_INSTRUMENTA_U_K,
+                bt.PRIMJENJENI_TECAJ,
+                bt.PRODAOIME,
+                bt.PRODAODOK,
+                v.PROVBANKE,
+                k.IME
+            FROM BLAGAJNICKE_TRANSAKCIJE bt
+            LEFT JOIN VALUTE v ON bt.TEC_VALUTA_BROJCANO = v.VALUTA_BROJCANO
+            LEFT JOIN KORISNICI k ON bt.SISUSER = k.IDKOR
+            WHERE bt.TEC_TL_DATUM_TECAJNE_LISTE >= CAST('{start_str}' AS DATE)
+              AND bt.TEC_TL_DATUM_TECAJNE_LISTE <= CAST('{end_str}' AS DATE)
+              AND bt.VTR_VRSTA_TRANSAKCIJE = 'FG'
+            ORDER BY bt.ID_BT
+        """
+
+        print(f"Izvršavam SQL za transakcije...")
+
+        cur.execute(sql)
+        rows = cur.fetchall()
+
+        con.close()
+
+        # Pretvaranje rezultata u listu dictionary objekata
+        transactions = []
+        for row in rows:
+            transactions.append(
+                {
+                    # Polja za valto_tetelek (stara struktura)
+                    "datum_tecajne_liste": row[0],
+                    "valuta": row[1],
+                    "iznos_valuta": row[2],
+                    "iznos_kune": row[3],
+                    "provbanke": row[11] if row[11] else 0,
+                    # Nova polja za kozonseges_tetelek
+                    "datum_vrijeme": row[4],  # DATUM_I_VRIJEME_TRANSAKCIJE
+                    "serijski_broj": row[5],  # SERIJSKI_BROJ
+                    "br_kartice": row[6],  # BR_KARTICE
+                    "oznaka_platnog": row[7],  # OZNAKA_PLATNOG_INSTRUMENTA_U_K
+                    "primjenjeni_tecaj": row[8],  # PRIMJENJENI_TECAJ
+                    "prodaoime": row[9],  # PRODAOIME
+                    "prodaodok": row[10],  # PRODAODOK
+                    "korisnik_ime": row[12],  # k.IME
+                }
+            )
+
+        print(f"✓ Dohvaćeno {len(transactions)} transakcija")
+        return transactions
+
+    except Exception as e:
+        print(f"❌ Greška pri dohvaćanju transakcija: {e}")
+        messagebox.showerror("Greška", f"Greška pri dohvaćanju transakcija:\n{e}")
+        return None
 
 
 def generate_xml(valto_nbr, start_date, end_date):
@@ -543,67 +505,59 @@ def generate_xml(valto_nbr, start_date, end_date):
             for t in transactions:
                 kozonseges_tetel = ET.SubElement(kozonseges_tetelek, "kozonseges_tetel")
 
-                ET.SubElement(kozonseges_tetel, "nbr").text = str(nbr_counter)
+            ET.SubElement(kozonseges_tetel, "nbr").text = str(nbr_counter)
 
-                # datum - TIMESTAMP format
-                datum_elem = ET.SubElement(kozonseges_tetel, "datum")
-                if isinstance(t["datum_vrijeme"], datetime):
-                    datum_elem.text = t["datum_vrijeme"].strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    datum_elem.text = str(t["datum_vrijeme"])
+            # datum - TIMESTAMP format
+            datum_elem = ET.SubElement(kozonseges_tetel, "datum")
+            if isinstance(t["datum_vrijeme"], datetime):
+                datum_elem.text = t["datum_vrijeme"].strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                datum_elem.text = str(t["datum_vrijeme"])
 
-                # Dohvat kupovnog tečaja iz dictionary-ja (BRZO!)
-                valuta = t["valuta"]
-                alap_arf_tecaj = tecajevi_dict.get(valuta, 1.0)
+            # Dohvat kupovnog tečaja iz dictionary-ja (BRZO!)
+            valuta = t["valuta"]
+            alap_arf_tecaj = tecajevi_dict.get(valuta, 1.0)  # ← OVDJE JE PROMJENA
 
-                ET.SubElement(kozonseges_tetel, "valto").text = str(valto_nbr)
-                ET.SubElement(kozonseges_tetel, "felhasznalo").text = (
-                    str(t["korisnik_ime"]) if t["korisnik_ime"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "tranzakcio").text = (
-                    str(t["serijski_broj"]) if t["serijski_broj"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "dokumentumszam").text = (
-                    str(t["br_kartice"]) if t["br_kartice"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "valuta").text = (
-                    str(t["valuta"]) if t["valuta"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "fiz_mod").text = (
-                    str(t["oznaka_platnog"]) if t["oznaka_platnog"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "ertek").text = (
-                    f"{float(t['iznos_valuta']):.2f}" if t["iznos_valuta"] else "0.00"
-                )
-                ET.SubElement(kozonseges_tetel, "akt_arf").text = (
-                    str(t["primjenjeni_tecaj"]) if t["primjenjeni_tecaj"] else ""
-                )
-                ET.SubElement(kozonseges_tetel, "alap_arf").text = (
-                    str(alap_arf_tecaj) if alap_arf_tecaj else ""
-                )
-                ET.SubElement(kozonseges_tetel, "bank_arf").text = (
-                    f"{float(t['provbanke']):.2f}" if t["provbanke"] else "0.00"
-                )
-                ET.SubElement(kozonseges_tetel, "honnan_hova").text = ""
-                ET.SubElement(kozonseges_tetel, "vevo_kod").text = (
-                    str(t["prodaoime"]) if t["prodaoime"] else ""
-                )
+            ET.SubElement(kozonseges_tetel, "valto").text = str(valto_nbr)
+            ET.SubElement(kozonseges_tetel, "felhasznalo").text = (
+                replace_croatian_chars(t["korisnik_ime"])
+            )
+            ET.SubElement(kozonseges_tetel, "tranzakcio").text = (
+                str(t["serijski_broj"]) if t["serijski_broj"] else ""
+            )
+            ET.SubElement(kozonseges_tetel, "dokumentumszam").text = (
+                replace_croatian_chars(t["br_kartice"])
+            )
+            ET.SubElement(kozonseges_tetel, "valuta").text = (
+                str(t["valuta"]) if t["valuta"] else ""
+            )
+            ET.SubElement(kozonseges_tetel, "fiz_mod").text = replace_croatian_chars(
+                t["oznaka_platnog"]
+            )
+            ET.SubElement(kozonseges_tetel, "ertek").text = (
+                f"{float(t['iznos_valuta']):.2f}" if t["iznos_valuta"] else "0.00"
+            )
+            ET.SubElement(kozonseges_tetel, "akt_arf").text = (
+                str(t["primjenjeni_tecaj"]) if t["primjenjeni_tecaj"] else ""
+            )
+            ET.SubElement(kozonseges_tetel, "alap_arf").text = (
+                str(alap_arf_tecaj) if alap_arf_tecaj else ""
+            )
+            ET.SubElement(kozonseges_tetel, "bank_arf").text = (
+                f"{float(t['provbanke']):.2f}" if t["provbanke"] else "0.00"
+            )
+            ET.SubElement(kozonseges_tetel, "honnan_hova").text = ""
+            ET.SubElement(kozonseges_tetel, "vevo_kod").text = replace_croatian_chars(
+                t["prodaoime"]
+            )
+            ET.SubElement(kozonseges_tetel, "vevo_cim").text = ""
+            ET.SubElement(kozonseges_tetel, "vevo_utlevel_id").text = (
+                replace_croatian_chars(t["prodaodok"])
+            )
+            ET.SubElement(kozonseges_tetel, "vevo_orszag").text = ""
 
-                ET.SubElement(kozonseges_tetel, "vevo_cim").text = ""
-                ET.SubElement(kozonseges_tetel, "vevo_utlevel_id").text = (
-                    str(t["prodaodok"]) if t["prodaodok"] else ""
-                )
-
-                # vevo_orszag - ako PRODAODOK NE sadrži 'BIH', upiši 'N'
-                vevo_orszag_value = (
-                    "N"
-                    if t["prodaodok"] and "BIH" not in str(t["prodaodok"]).upper()
-                    else ""
-                )
-                ET.SubElement(kozonseges_tetel, "vevo_orszag").text = vevo_orszag_value
-
-                nbr_counter += 1
-                total_kozonseges += 1
+            nbr_counter += 1
+            total_kozonseges += 1
 
             # Sljedeći datum
             current_date += timedelta(days=1)
@@ -618,124 +572,7 @@ def generate_xml(valto_nbr, start_date, end_date):
         # Generiranje naziva datoteke
         now = datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
-        filename = f"{valto_nbr}_rpt_{timestamp}.XML"
-
-        xml_folder = "C:/XML"
-        if not os.path.exists(xml_folder):
-            os.makedirs(xml_folder)
-
-        filepath = os.path.join(xml_folder, filename)
-
-        tree = ET.ElementTree(root)
-        ET.indent(tree, space="  ")
-        tree.write(filepath, encoding="UTF-8", xml_declaration=True)
-
-        # Popravak self-closing tagova
-
-        # Post-processing: zamjena self-closing tagova
-        print("  → Popravljam self-closing tagove...")
-        with open(filepath, "r", encoding="UTF-8") as f:
-            xml_content = f.read()
-
-        # Lista tagova koji trebaju biti otvoreni/zatvoreni (ne self-closing)
-        tags_to_fix = [
-            "honnan_hova",
-            "vevo_kod",
-            "vevo_cim",
-            "vevo_utlevel_id",
-            "vevo_orszag",
-        ]
-
-        for tag in tags_to_fix:
-            xml_content = xml_content.replace(f"<{tag} />", f"<{tag}></{tag}>")
-            xml_content = xml_content.replace(
-                f"<{tag}/>", f"<{tag}></{tag}>"
-            )  # Bez razmaka također
-
-        with open(filepath, "w", encoding="UTF-8") as f:
-            f.write(xml_content)
-        # END Popravak self-closing tagova
-
-        print(f"✓ XML datoteka kreirana: {filepath}")
-
-        return filename
-
-    except Exception as e:
-        print(f"❌ Greška pri generiranju XML-a: {e}")
-        messagebox.showerror("Greška", f"Greška pri generiranju XML-a:\n{e}")
-        return None
-
-
-# ═══════════════════════════════════════════════════════════
-# FTP UPLOAD
-# ═══════════════════════════════════════════════════════════
-
-
-def upload_to_ftp(filename):
-    """
-    Šalje XML datoteku na FTP server koristeći parametre iz REPORT.INI.
-
-    Parametri:
-        filename: string - naziv XML datoteke
-
-    Vraća:
-        bool - True ako uspješno, False ako greška
-    """
-    try:
-        xml_folder = "C:/XML"
-        filepath = os.path.join(xml_folder, filename)
-
-        if not os.path.exists(filepath):
-            print(f"❌ Datoteka ne postoji: {filepath}")
-            messagebox.showerror("Greška", f"Datoteka nije pronađena:\n{filepath}")
-            return False
-
-        print(f"\nSpajam se na FTP server: {FTP_CONFIG['host']}")
-        print(f"Korisnik: {FTP_CONFIG['user']}")
-
-        # Spajanje na FTP
-        ftp = FTP()
-        ftp.connect(FTP_CONFIG["host"], 21)  # Port 21 za FTP
-        ftp.login(FTP_CONFIG["user"], FTP_CONFIG["password"])
-
-        print(f"✓ Uspješno spojen na FTP server")
-        print(f"Trenutni direktorij: {ftp.pwd()}")
-
-        # Upload datoteke
-        print(f"Šaljem datoteku: {filename}")
-        with open(filepath, "rb") as file:
-            ftp.storbinary(f"STOR {filename}", file)
-
-        print(f"✓ Datoteka uspješno poslana!")
-
-        # Provjera da li je datoteka stvarno poslana
-        files = ftp.nlst()
-        if filename in files:
-            print(f"✓ Potvrđeno: {filename} je na serveru")
-
-        # Zatvaranje konekcije
-        ftp.quit()
-
-        return True
-
-    except Exception as e:
-        print(f"❌ Greška pri FTP uploadu: {e}")
-        messagebox.showerror(
-            "Greška pri slanju", f"Greška pri slanju datoteke na FTP server:\n\n{e}"
-        )
-        return False
-
-        # ═══════════════════════════════════════════════════════════
-        # SPREMANJE XML-a
-        # ═══════════════════════════════════════════════════════════
-
-        print(f"\n✓ Ukupno valto_tetel elemenata: {total_valto}")
-        print(f"✓ Ukupno kozonseges_tetel elemenata: {total_kozonseges}")
-
-        # Generiranje naziva datoteke
-        now = datetime.now()
-        timestamp = now.strftime("%Y%m%d_%H%M%S")
-        filename = f"{valto_nbr}_rpt_{timestamp}.XML"
+        filename = f"{valto_nbr}_{timestamp}.XML"
 
         xml_folder = "C:/XML"
         if not os.path.exists(xml_folder):
@@ -813,50 +650,32 @@ button_frame.pack(pady=20)
 status_label = tk.Label(root, text="Spremno za rad", font=("Arial", 9), fg="gray")
 status_label.pack(pady=10)
 
-
 # ═══════════════════════════════════════════════════════════
-# EVENT HANDLER FUNKCIJE
+# EVENT HANDLER FUNKCIJE (koriste GUI elemente)
 # ═══════════════════════════════════════════════════════════
 
 
-def generate_xml_handler():
+def test_database():
     """
     Generira XML datoteku iz podataka iz baze.
     """
-    status_label.config(text="Spajam se na bazu...", fg="blue")
+    status_label.config(text="Dohvaćam podatke iz baze...", fg="blue")
     root.update()
 
-    # 1. Datumi - dohvati ih PRVO da bi mogli validirati
-    start = start_date.get_date()
-    end = end_date.get_date()
-
-    # 2. VALIDACIJA DATUMA
-    if end < start:
-        status_label.config(text="❌ Neispravan raspon datuma", fg="red")
-        messagebox.showwarning(
-            "Neispravan unos",
-            "Završni datum ne može biti manji od početnog!\n\n"
-            f"Početni datum: {start.strftime('%d.%m.%Y')}\n"
-            f"Završni datum: {end.strftime('%d.%m.%Y')}",
-        )
-        status_label.config(text="Spremno za rad", fg="gray")
-        return  # Prekini izvršavanje
-
-    # 3. Otvori konekciju na bazu
-    if not connect_to_database():
-        status_label.config(text="❌ Ne mogu se spojiti na bazu", fg="red")
-        return
-
-    # 4. Dohvat UNIQUEID
+    # 1. Dohvat UNIQUEID
     valto_nbr = get_uniqueid()
 
     if not valto_nbr:
         status_label.config(text="❌ Greška pri dohvaćanju UNIQUEID", fg="red")
         return
 
+    # 2. Datumi
+    start = start_date.get_date()
+    end = end_date.get_date()
+
     print(f"Odabrani period: {start} - {end}")
 
-    # 5. Generiranje XML-a (iteracija po datumima)
+    # 3. Generiranje XML-a (iteracija po datumima)
     status_label.config(text="Generiram XML...", fg="blue")
     root.update()
 
@@ -866,7 +685,7 @@ def generate_xml_handler():
         status_label.config(text="❌ Greška pri generiranju XML-a", fg="red")
         return
 
-    # 6. Uspjeh!
+    # 4. Uspjeh!
     status_label.config(text=f"✓ XML kreiran: {filename}", fg="green")
 
     messagebox.showinfo(
@@ -874,12 +693,10 @@ def generate_xml_handler():
         f"XML datoteka uspješno kreirana!\n\n"
         f"Naziv: {filename}\n"
         f"Lokacija: C:\\XML\\\n"
-        f"POSLOVNICA: {valto_nbr}\n\n"
-        f"SADA JE POŠALJITE NA SERVER",
+        f"UNIQUEID: {valto_nbr}",
     )
 
-    # 7. Omogući dugme "Pošalji na server" i onemogući "Generiraj XML"
-    btn_generate.config(state="disabled")
+    # Omogući dugme "Pošalji na server"
     btn_send.config(state="normal")
 
     # Spremi naziv datoteke za FTP upload
@@ -887,52 +704,8 @@ def generate_xml_handler():
     current_xml_file = filename
 
 
-def on_closing():
-    """
-    Poziva se kada korisnik zatvara aplikaciju.
-    Zatvara konekciju na bazu prije izlaska.
-    """
-    print("\nZatvaranje aplikacije...")
-    close_database_connection()
-    root.destroy()
-
-
-def send_to_ftp_handler():
-    """
-    Šalje XML datoteku na FTP server.
-    """
-    global current_xml_file
-
-    if not current_xml_file:
-        messagebox.showwarning("Upozorenje", "Nema generirane XML datoteke za slanje!")
-        return
-
-    status_label.config(text="Šaljem datoteku na server...", fg="blue")
-    root.update()
-
-    # Upload na FTP
-    success = upload_to_ftp(current_xml_file)
-
-    if success:
-        status_label.config(text=f"✓ Datoteka poslana: {current_xml_file}", fg="green")
-        messagebox.showinfo(
-            "Uspjeh",
-            f"XML datoteka uspješno poslana na server!\n\n"
-            f"Datoteka: {current_xml_file}\n"
-            f"Server: {FTP_CONFIG['host']}",
-        )
-
-        # Resetuj dugmad - omogući ponovno generiranje
-        btn_generate.config(state="normal")
-        btn_send.config(state="disabled")
-        current_xml_file = None
-
-    else:
-        status_label.config(text="❌ Greška pri slanju na server", fg="red")
-
-
 # ═══════════════════════════════════════════════════════════
-# DUGMAD
+# DUGMAD (definirani NAKON event handler funkcija)
 # ═══════════════════════════════════════════════════════════
 
 # Dugme "Generiraj XML"
@@ -945,7 +718,7 @@ btn_generate = tk.Button(
     fg="white",
     font=("Arial", 10, "bold"),
     cursor="hand2",
-    command=generate_xml_handler,
+    command=test_database,
 )
 btn_generate.grid(row=0, column=0, padx=10)
 
@@ -960,17 +733,11 @@ btn_send = tk.Button(
     font=("Arial", 10, "bold"),
     cursor="hand2",
     state="disabled",
-    command=send_to_ftp_handler,
 )
 btn_send.grid(row=0, column=1, padx=10)
-
 
 # ═══════════════════════════════════════════════════════════
 # POKRETANJE APLIKACIJE
 # ═══════════════════════════════════════════════════════════
 
-# Postavi handler za zatvaranje prozora
-root.protocol("WM_DELETE_WINDOW", on_closing)
-
-# Pokreni aplikaciju
 root.mainloop()

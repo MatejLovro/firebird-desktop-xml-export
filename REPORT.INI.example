@@ -1,0 +1,10 @@
+[DATABASE]
+database=C:/EXCHBIH/EXCHANGE-2026ISM.FDB
+host=localhost
+user=SYSDBA
+password=masterkey
+
+[FTP]
+host=ftp.ekonto.hr
+user=your_username@example.com
+password=your_password_here

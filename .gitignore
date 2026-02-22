@@ -1,3 +1,29 @@
+[DATABASE]
+database=C:/EXCHBIH/EXCHANGE-2026ISM.FDB
+host=localhost
+user=SYSDBA
+password=masterkey
+
+[FTP]
+host=ftp.ekonto.hr
+user=USERNAME@example.com
+password=YOUR_PASSWORD_HERE
+```
+
+Spremite kao `REPORT.INI.example`
+
+---
+
+## **Korak 3: Kreirajte requirements.txt**
+```
+fdb==2.0.2
+tkcalendar==1.6.1
+```
+
+---
+
+## **Korak 4: Provjerite .gitignore**
+```
 # Python
 __pycache__/
 *.py[cod]
@@ -9,6 +35,7 @@ venv/
 *.egg-info/
 dist/
 build/
+*.spec
 
 # IDE
 .vscode/
@@ -20,7 +47,15 @@ build/
 .DS_Store
 Thumbs.db
 
-# Projektnо specifično
+# Project specific
 *.FDB
 *.fdb
+REPORT.INI
+*.XML
 C:/XML/
+fbclient.dll
+gds32.dll
+*.ico
+
+# PyInstaller
+*.spec

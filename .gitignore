@@ -53,8 +53,8 @@ Thumbs.db
 REPORT.INI
 *.XML
 C:/XML/
-fbclient.dll
-gds32.dll
+#fbclient.dll
+#gds32.dll
 *.ico
 
 # PyInstaller

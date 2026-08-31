@@ -1,0 +1,18 @@
+2026-08-31 20:56:19,090 DEBUG [get_transactions_for_idblag] get_transactions_for_idblag: IDBLAG=5094
+2026-08-31 20:56:19,094 ERROR [get_transactions_for_idblag] Greška pri dohvaćanju transakcija za IDBLAG=5094
+Traceback (most recent call last):
+  File "c:\Projects\firebird-pyton\app.py", line 411, in get_transactions_for_idblag
+    rows = cur.fetchall()
+  File "C:\Projects\firebird-pyton\.venv\Lib\site-packages\fdb\fbcore.py", line 3817, in fetchall
+    return [row for row in self]
+                           ^^^^
+  File "C:\Projects\firebird-pyton\.venv\Lib\site-packages\fdb\fbcore.py", line 3549, in next
+    row = self.fetchone()
+  File "C:\Projects\firebird-pyton\.venv\Lib\site-packages\fdb\fbcore.py", line 3769, in fetchone
+    return self._ps._fetchone()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Projects\firebird-pyton\.venv\Lib\site-packages\fdb\fbcore.py", line 3425, in _fetchone
+    raise exception_from_status(DatabaseError, self._isc_status, "Cursor.fetchone:")
+fdb.fbcore.DatabaseError: ('Cursor.fetchone:\n- SQLCODE: -802\n- arithmetic exception, numeric overflow, or string truncation', -802, 335544321)
+2026-08-31 21:11:39,867 DEBUG [get_transactions_for_idblag] get_transactions_for_idblag: IDBLAG=5094
+2026-08-31 21:11:39,874 DEBUG [get_transactions_for_idblag] get_transactions_for_idblag: dohvaćeno 121 redaka

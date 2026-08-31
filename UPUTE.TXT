@@ -1,0 +1,24 @@
+U komunikaciji s Claude-om potražiti tekst "Desktop aplikacija (Python + Tkinter) koja:"
+Tu počinje Python aplikacija.
+
+// nadogradnja pip-a
+python -m pip install --upgrade pip
+
+
+1. Instalirati Python 3.12   32-bitni
+2. Instalirati Python packages
+
+   pip install flask 
+   pip install fdb tkcalendar pyinstaller
+
+   
+
+
+KREIRANJE .EXE
+pronaći datoteku za ikonu i nazvati je app.ico
+pip install pyinstaller==6.11.0
+
+pyinstaller --onefile --windowed --name="XMLExport" --icon=app.ico app.py
+
+
+pyinstaller --onefile --windowed --name="XMLExport" --add-binary="C:\Program Files (x86)\Firebird\Firebird_1_5\bin/fbclient.dll;." --icon=app.ico app.py

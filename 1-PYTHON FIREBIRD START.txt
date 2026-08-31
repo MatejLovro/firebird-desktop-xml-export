@@ -1,0 +1,38 @@
+U komunikaciji s Claude-om potražiti tekst "Desktop aplikacija (Python + Tkinter) koja:"
+Tu počinje Python aplikacija.
+
+1. Instalirati Firebird 3.0 pa ga deinstalirati
+   (On ostavi neke postavke koje trebaju)
+2. Instalirati Firebird 1.5.6.
+3. u SysWOW64 kopirati fbclient.dll Firebirda 3.0 veličine 1.299 KB
+
+4. Instalirati Python 3.12   32-bitni
+5. U VSCode instalirati Python languagge support (Microsoft)
+6. Instalirati Python packages
+
+   pip install flask 
+   pip install fdb tkcalendar pyinstaller
+
+// nadogradnja pip-a
+python -m pip install --upgrade pip
+   
+
+
+KREIRANJE .EXE
+pronaći datoteku za ikonu i nazvati je app.ico
+pip install pyinstaller==6.11.0
+
+pyinstaller --onefile --windowed --name="XMLExport" --icon=app.ico app.py
+
+
+pyinstaller --onefile --windowed --name="XMLExport" --add-binary="C:\Program Files (x86)\Firebird\Firebird_1_5\bin/fbclient.dll;." --icon=app.ico app.py
+
+   pip install fdb tkcalendar
+
+
+Kod se pokreće tako da na app.py u desnom prozoru kliknem desnom tipkom miša i 
+Run Python - file in terminal
+
+4. Budući da stara verzija fbclient.datoteke nema potrebne funkcije, 
+   u folder Windows\SysWow64\ ručno se kopira fbclient.dll iz Firebirda 3.0
+   (slika FBCLIENT-DLL)

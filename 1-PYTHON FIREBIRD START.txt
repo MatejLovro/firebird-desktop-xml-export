@@ -22,10 +22,12 @@ KREIRANJE .EXE
 pronaći datoteku za ikonu i nazvati je app.ico
 pip install pyinstaller==6.11.0
 
-pyinstaller --onefile --windowed --name="XMLExport" --icon=app.ico app.py
+// OVA NAREDBA ZA KOMPAJLIRANJE RADI (s _interpret folderom )
+pyinstaller --onedir --windowed --name="XMLExport" --icon=app.ico --add-binary="*.dll;." app.py
 
+// Za --onefile verziju (jedan .exe bez foldera):
+pyinstaller --onefile --windowed --name="XMLExport" --icon=app.ico --add-binary="fbclient.dll;." --add-binary="gds32.dll;." app.py
 
-pyinstaller --onefile --windowed --name="XMLExport" --add-binary="C:\Program Files (x86)\Firebird\Firebird_1_5\bin/fbclient.dll;." --icon=app.ico app.py
 
    pip install fdb tkcalendar
 

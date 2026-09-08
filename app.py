@@ -271,7 +271,7 @@ def get_blagajna_stanje(id_blag):
             results.append(
                 {
                     "valuta": row[0],
-                    "iznos": row[1],
+                    "iznos": row[1] if row[1] is not None else 0,
                     "prov_za_banku": row[2] if row[2] else 0,
                 }
             )
